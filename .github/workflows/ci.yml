@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Text check
+        run: ./Scripts/check-text.sh
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build (release, universal)
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Test
+        run: swift test
+
+      - name: Smoke test
+        run: |
+          BIN=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/nightshift
+          lipo -info "$BIN"
+          "$BIN" version
+          "$BIN" help
+          # Hosted runners may not expose Night Shift, so status is informational only.
+          "$BIN" status || true
+
+      - name: Package
+        run: ./Scripts/build-release.sh --universal
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightshift-macos-universal
+          path: dist/*.zip
