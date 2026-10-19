@@ -40,12 +40,13 @@ jobs:
           ./Scripts/build-app-pkg.sh --universal
           lipo -info dist/NightShiftCtl.app/Contents/MacOS/NightShiftCtl
           dist/NightShiftCtl.app/Contents/MacOS/NightShiftCtl --self-test || true
-          (cd dist && ditto -c -k --keepParent NightShiftCtl.app NightShiftCtl-app.zip)
+          VERSION=$(sed -nE 's/.*current = "(.*)".*/\1/p' Sources/NightShiftKit/Version.swift)
+          (cd dist && ditto -c -k --keepParent NightShiftCtl.app "NightShiftCtl-${VERSION}-app.zip")
 
       - uses: actions/upload-artifact@v4
         with:
           name: nightshift-macos-universal
           path: |
             dist/nightshift-*.zip
-            dist/NightShiftCtl-app.zip
+            dist/NightShiftCtl-*-app.zip
             dist/NightShiftCtl-*.pkg

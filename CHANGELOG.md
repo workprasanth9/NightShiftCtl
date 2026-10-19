@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-10-19
+
+### Fixed
+- Empty Trash and Dark Mode failed with "Not authorized to send Apple events".
+  The app runs with the hardened runtime but was missing the
+  `com.apple.security.automation.apple-events` entitlement, so macOS denied
+  Apple events without ever showing the permission prompt. The entitlement is
+  now included and the build script checks for it.
+- Dark Mode now switches directly through the system appearance call, with no
+  permission prompt. System Events is only a fallback.
+- Empty Trash deletes items in ~/.Trash directly when allowed, and otherwise
+  asks Finder, which now shows the standard one time permission prompt. The
+  confirmation shows how many items are in the Trash.
+- Clearer error messages that explain how to allow Automation access.
+
+### Added
+- First launch welcome window explaining that the app lives in the menu bar,
+  with a tip for MacBooks with a notch. Reopen it from Welcome and Tips.
+- Thank you page at the end of the installer.
+- The .pkg is now a distribution package (productbuild) so it can show that page.
+- README sections for permissions, first launch, Gatekeeper, and Support.
+- `--run-action` diagnostics flag to run single menu actions from Terminal.
+
 ## [1.1.0] - 2026-10-19
 
 ### Added

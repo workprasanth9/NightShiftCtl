@@ -5,6 +5,11 @@ if CommandLine.arguments.contains("--self-test") {
     exit(0)
 }
 
+if let index = CommandLine.arguments.firstIndex(of: "--run-action") {
+    let name = CommandLine.arguments.indices.contains(index + 1) ? CommandLine.arguments[index + 1] : ""
+    exit(SelfTest.runAction(name))
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

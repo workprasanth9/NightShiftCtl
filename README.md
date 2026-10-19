@@ -40,11 +40,11 @@ one click away.
 | Night Shift | On/off toggle, warmth slider (0 to 100), schedule picker: Off, Sunset to Sunrise, Custom times with an editor |
 | True Tone | Shows whether True Tone is on (read only) |
 | Keep Awake | Prevents idle sleep for 15 min, 30 min, 1, 2, 4 or 8 hours, or until turned off. Uses a standard IOKit power assertion and shows the end time |
-| Dark Mode | Switches between Light and Dark appearance |
+| Dark Mode | Switches between Light and Dark appearance instantly, no permission prompt |
 | Hide Desktop Icons | Hides or shows icons on the desktop (restarts Finder) |
 | Show Hidden Files | Shows or hides dot files in Finder (restarts Finder) |
 | Lock Screen | Locks the Mac immediately (also Cmd+L while the menu is open) |
-| Empty Trash | Empties the Trash after a confirmation |
+| Empty Trash | Shows how many items are in the Trash and empties it after a confirmation |
 | Flush DNS Cache | Runs `dscacheutil -flushcache` and restarts mDNSResponder behind the standard admin prompt |
 | Network | Lists local IPv4 addresses, looks up the public IP on request, click any address to copy it |
 | Launch at Login | Starts the app at login (macOS 13 and later) |
@@ -54,11 +54,45 @@ moon while Keep Awake is active.
 
 ### Permissions
 
-- **Dark Mode** and **Empty Trash** use AppleScript, so the first time macOS asks
-  to let NightShiftCtl control System Events or Finder. You can change this
-  later in System Settings > Privacy & Security > Automation.
+- **Empty Trash** deletes the items in `~/.Trash` directly when macOS allows it.
+  On recent macOS the Trash folder is privacy protected, so the app asks Finder
+  to empty it instead, and macOS shows a one time prompt: "NightShiftCtl wants
+  access to control Finder". Click **Allow**. You can change this later in
+  System Settings > Privacy & Security > Automation.
+- **Dark Mode** uses the same system call as System Settings, so it needs no
+  permission. If that call is ever unavailable it falls back to System Events,
+  which shows a similar one time prompt.
 - **Flush DNS** asks for an administrator password each time.
 - Everything else needs no permissions.
+
+If you clicked **Don't Allow** earlier, reset the choice and try again:
+
+```bash
+tccutil reset AppleEvents com.workprasanth9.NightShiftCtl
+```
+
+### First launch
+
+The first time it opens, NightShiftCtl shows a short welcome window. The app
+lives in the menu bar (look for the moon icon near the clock) and has no Dock
+icon. On a MacBook with a notch, a crowded menu bar can hide icons behind the
+notch: quit a few menu bar apps, or hold Command and drag the moon to the right.
+You can reopen the window from **Welcome and Tips...** in the menu.
+
+### Gatekeeper: "NightShiftCtl cannot be opened"
+
+Release builds are ad hoc signed, not notarized by Apple, so the first launch of
+a downloaded copy may be blocked. To open it:
+
+1. In Finder, open Applications, **right click** (or Control click) NightShiftCtl
+   and choose **Open**, then click **Open** again in the dialog.
+2. On macOS 15 and later, if there is no Open button, go to System Settings >
+   Privacy & Security, scroll to the NightShiftCtl message, and click
+   **Open Anyway**.
+
+You only need to do this once. Admins deploying with Jamf can sign the app and
+package with their own Developer ID (see `SIGN_ID` and `PKG_SIGN_ID` below), in
+which case users see no warning.
 
 ### Left out on purpose
 
@@ -89,7 +123,7 @@ sudo installer -pkg dist/NightShiftCtl-*.pkg -target /
 open /Applications/NightShiftCtl.app
 ```
 
-The package installs:
+The package shows a short thank you page when it finishes and installs:
 
 - `/Applications/NightShiftCtl.app`
 - `/usr/local/bin/nightshift`
@@ -237,6 +271,7 @@ swift test                      # unit tests (needs Xcode, XCTest is not in Comm
 ./Scripts/make-icns.sh          # regenerate App/AppIcon.icns from Scripts/make-icon.swift
 ./Scripts/check-text.sh         # style check used by CI
 dist/NightShiftCtl.app/Contents/MacOS/NightShiftCtl --self-test   # read only diagnostics
+dist/NightShiftCtl.app/Contents/MacOS/NightShiftCtl --run-action dark-mode   # run one action (dark-mode, desktop-icons, hidden-files, trash-count, public-ip)
 ```
 
 Project layout:
@@ -245,9 +280,17 @@ Project layout:
 - `Sources/NightShiftKit`: Swift API (status, on/off, strength, schedule, parsing)
 - `Sources/nightshift`: the command line tool
 - `Sources/NightShiftCtlApp`: the menu bar app (AppKit)
-- `App`: Info.plist and icon for the app bundle
+- `App`: Info.plist, entitlements and icon for the app bundle
+- `Installer`: the installer's thank you page
 - `Jamf`: extension attribute and policy samples
 - `Tests/NightShiftKitTests`: unit tests for parsing and conversions
+
+## Support
+
+NightShiftCtl is free and open source. Thank you for using it! If it saves you
+a few clicks, the best way to support it is to
+[star the repo on GitHub](https://github.com/workprasanth9/NightShiftCtl) and
+share it with a Mac admin friend. Bug reports and ideas are just as welcome.
 
 ## Contributing
 

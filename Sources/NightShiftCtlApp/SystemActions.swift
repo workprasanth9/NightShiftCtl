@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
 
-/// Mac toggles and actions that use public, documented mechanisms only
-/// (defaults, AppleScript, IOKit), with no special entitlements.
+/// Mac toggles and actions. Each one prefers a direct method that needs no
+/// permission prompt, and falls back to Apple events only when it has to.
 enum SystemActions {
     // MARK: Helpers
 
@@ -18,15 +18,18 @@ enum SystemActions {
         return task.terminationStatus
     }
 
-    /// Runs AppleScript and returns an error message on failure.
+    /// Runs AppleScript and returns an error message on failure (nil on success or cancel).
     static func appleScript(_ source: String) -> String? {
         var error: NSDictionary?
         NSAppleScript(source: source)?.executeAndReturnError(&error)
-        if let error {
-            if (error[NSAppleScript.errorNumber] as? Int) == -128 { return nil } // user cancelled
-            return error[NSAppleScript.errorMessage] as? String ?? "AppleScript error"
+        guard let error else { return nil }
+        let number = error[NSAppleScript.errorNumber] as? Int ?? 0
+        if number == -128 { return nil } // user cancelled
+        let message = error[NSAppleScript.errorMessage] as? String ?? "AppleScript error"
+        if number == -1743 {
+            return "\(message)\n\nOpen System Settings > Privacy & Security > Automation and turn on the switch for NightShiftCtl."
         }
-        return nil
+        return message
     }
 
     static func finderBool(_ key: String, default value: Bool) -> Bool {
@@ -47,14 +50,40 @@ enum SystemActions {
 
     // MARK: Appearance
 
-    static var isDarkMode: Bool {
-        UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+    private static let skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+
+    private typealias GetTheme = @convention(c) () -> Bool
+    private typealias SetTheme = @convention(c) (Bool) -> Void
+
+    private static var getTheme: GetTheme? {
+        guard let skyLight, let sym = dlsym(skyLight, "SLSGetAppearanceThemeLegacy") else { return nil }
+        return unsafeBitCast(sym, to: GetTheme.self)
     }
 
-    /// Uses System Events, the supported way to change appearance. macOS asks for
-    /// Automation permission the first time.
+    private static var setTheme: SetTheme? {
+        guard let skyLight else { return nil }
+        let sym = dlsym(skyLight, "SLSSetAppearanceThemeNotifying") ?? dlsym(skyLight, "SLSSetAppearanceThemeLegacy")
+        guard let sym else { return nil }
+        return unsafeBitCast(sym, to: SetTheme.self)
+    }
+
+    /// True when Dark Mode can change without any permission prompt.
+    static var canSetDarkModeDirectly: Bool { getTheme != nil && setTheme != nil }
+
+    static var isDarkMode: Bool {
+        if let getTheme { return getTheme() }
+        return UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+    }
+
+    /// Uses the same window server call as the Appearance setting in System
+    /// Settings, which applies instantly and needs no permission. Falls back to
+    /// System Events (Automation prompt) if that call is not available.
     static func setDarkMode(_ dark: Bool) -> String? {
-        appleScript("tell application \"System Events\" to tell appearance preferences to set dark mode to \(dark)")
+        if let setTheme {
+            setTheme(dark)
+            return nil
+        }
+        return appleScript("tell application \"System Events\" to tell appearance preferences to set dark mode to \(dark)")
     }
 
     // MARK: Finder
@@ -65,8 +94,58 @@ enum SystemActions {
     static var hiddenFilesVisible: Bool { finderBool("AppleShowAllFiles", default: false) }
     static func setHiddenFilesVisible(_ visible: Bool) { setFinderBool("AppleShowAllFiles", visible) }
 
-    static func emptyTrash() -> String? {
-        appleScript("tell application \"Finder\" to empty trash")
+    // MARK: Trash
+
+    enum TrashResult: Equatable {
+        case emptied(Int)
+        case alreadyEmpty
+        case failed(String)
+    }
+
+    static var trashURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
+    }
+
+    /// Returns the number of items in the Trash, or nil when macOS does not let
+    /// the app read the folder (it is privacy protected on recent macOS).
+    static func trashItemCount() -> Int? {
+        try? FileManager.default.contentsOfDirectory(at: trashURL, includingPropertiesForKeys: nil).count
+    }
+
+    /// Empties the Trash directly with FileManager. If macOS blocks access to
+    /// ~/.Trash, asks Finder instead (one time Automation prompt).
+    static func emptyTrash() -> TrashResult {
+        let fm = FileManager.default
+        let items: [URL]
+        do {
+            items = try fm.contentsOfDirectory(at: trashURL, includingPropertiesForKeys: nil)
+        } catch {
+            return emptyTrashWithFinder()
+        }
+        if items.isEmpty { return .alreadyEmpty }
+        var removed = 0
+        var failures: [String] = []
+        for item in items {
+            do {
+                try fm.removeItem(at: item)
+                removed += 1
+            } catch {
+                failures.append(item.lastPathComponent)
+            }
+        }
+        if failures.isEmpty { return .emptied(removed) }
+        // Locked or protected items: let Finder try the rest.
+        if case .failed(let message) = emptyTrashWithFinder() {
+            return .failed("Some items could not be deleted (\(failures.prefix(3).joined(separator: ", "))).\n\n\(message)")
+        }
+        return .emptied(items.count)
+    }
+
+    private static func emptyTrashWithFinder() -> TrashResult {
+        if let error = appleScript("tell application \"Finder\" to empty trash") {
+            return .failed(error)
+        }
+        return .emptied(0)
     }
 
     // MARK: Lock screen
@@ -95,6 +174,7 @@ enum SystemActions {
     // MARK: Network
 
     /// Flushes the DNS cache. macOS shows its standard administrator prompt.
+    /// `do shell script` runs inside the app, so no Automation permission is needed.
     static func flushDNS() -> String? {
         appleScript("do shell script \"/usr/bin/dscacheutil -flushcache; /usr/bin/killall -HUP mDNSResponder\" with administrator privileges")
     }
@@ -102,5 +182,9 @@ enum SystemActions {
     static func copyToPasteboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    static func openURL(_ string: String) {
+        if let url = URL(string: string) { NSWorkspace.shared.open(url) }
     }
 }

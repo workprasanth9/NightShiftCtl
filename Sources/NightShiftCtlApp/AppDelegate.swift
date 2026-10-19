@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var nightShift: NightShift?
     private var publicIP: String?
     private var fetchingPublicIP = false
+    private var welcome: WelcomeWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         nightShift = try? NightShift()
@@ -17,6 +18,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         keepAwake.onChange = { [weak self] in self?.updateIcon() }
         updateIcon()
+        if WelcomeWindowController.shouldShowOnLaunch || CommandLine.arguments.contains("--welcome") {
+            showWelcome()
+        }
+    }
+
+    @objc private func showWelcome() {
+        if welcome == nil { welcome = WelcomeWindowController() }
+        welcome?.present()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -225,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleDarkMode() {
         if let error = SystemActions.setDarkMode(!SystemActions.isDarkMode) {
-            showError("Could not change Dark Mode. Allow NightShiftCtl to control System Events in System Settings > Privacy & Security > Automation.\n\n\(error)")
+            showError("Could not change Dark Mode.\n\n\(error)")
         }
     }
 
@@ -250,15 +259,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func emptyTrash() {
         let alert = NSAlert()
-        alert.messageText = "Empty the Trash?"
+        let count = SystemActions.trashItemCount()
+        if count == 0 {
+            notify("The Trash is already empty.")
+            return
+        }
+        alert.messageText = count.map { "Empty the Trash (\($0) item\($0 == 1 ? "" : "s"))?" } ?? "Empty the Trash?"
         alert.informativeText = "All items in the Trash will be permanently deleted. This cannot be undone."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Empty Trash")
         alert.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        if let error = SystemActions.emptyTrash() {
-            showError("Could not empty the Trash. Allow NightShiftCtl to control Finder in System Settings > Privacy & Security > Automation.\n\n\(error)")
+        switch SystemActions.emptyTrash() {
+        case .emptied, .alreadyEmpty:
+            break
+        case .failed(let error):
+            showError("Could not empty the Trash.\n\n\(error)")
         }
     }
 
@@ -321,6 +338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item("Launch at Login", #selector(toggleLaunchAtLogin), state: LoginItem.isEnabled)
         }
         item("Night Shift Settings...", #selector(openDisplaySettings))
+        item("Welcome and Tips...", #selector(showWelcome))
         item("About NightShiftCtl", #selector(showAbout))
         item("Quit NightShiftCtl", #selector(quit), key: "q")
     }
@@ -341,7 +359,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationVersion: NightShiftCtlVersion.current,
-            .credits: NSAttributedString(string: "Open source under the MIT license.\ngithub.com/workprasanth9/NightShiftCtl"),
+            .credits: NSAttributedString(string: "Open source under the MIT license.\n\(NightShiftCtlLinks.repositoryURL)\nThank you for using it! A star on GitHub helps a lot."),
         ])
     }
 

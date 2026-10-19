@@ -29,7 +29,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>NightShiftCtl uses System Events to switch Dark Mode and Finder to empty the Trash.</string>
+	<string>NightShiftCtl asks Finder to empty the Trash, and uses System Events to switch Dark Mode if the direct method is unavailable.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>

@@ -29,7 +29,12 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null
 # Developer ID identity to sign for distribution.
 SIGN_ID="${SIGN_ID:--}"
 codesign --force --options runtime --timestamp=none --sign "$SIGN_ID" "$APP/Contents/Resources/nightshift"
-codesign --force --options runtime --timestamp=none --sign "$SIGN_ID" "$APP"
+codesign --force --options runtime --timestamp=none --entitlements App/NightShiftCtl.entitlements --sign "$SIGN_ID" "$APP"
 codesign --verify --strict "$APP"
+ENTITLEMENTS=$(codesign -d --entitlements - "$APP" 2>/dev/null || true)
+if [[ "$ENTITLEMENTS" != *"automation.apple-events"* ]]; then
+  echo "error: apple-events entitlement missing from the signed app" >&2
+  exit 1
+fi
 
 echo "Built $APP ($VERSION, $(lipo -archs "$APP/Contents/MacOS/NightShiftCtl"))"
