@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION=$(grep -E '^let version' Sources/nightshift/main.swift | sed -E 's/.*"(.*)".*/\1/')
+VERSION=$(sed -nE 's/.*current = "(.*)".*/\1/p' Sources/NightShiftKit/Version.swift)
 mkdir -p dist
 
 if [[ "${1:-}" == "--universal" ]]; then

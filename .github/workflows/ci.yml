@@ -32,10 +32,20 @@ jobs:
           # Hosted runners may not expose Night Shift, so status is informational only.
           "$BIN" status || true
 
-      - name: Package
+      - name: Package CLI
         run: ./Scripts/build-release.sh --universal
+
+      - name: Build menu bar app and installer
+        run: |
+          ./Scripts/build-app-pkg.sh --universal
+          lipo -info dist/NightShiftCtl.app/Contents/MacOS/NightShiftCtl
+          dist/NightShiftCtl.app/Contents/MacOS/NightShiftCtl --self-test || true
+          (cd dist && ditto -c -k --keepParent NightShiftCtl.app NightShiftCtl-app.zip)
 
       - uses: actions/upload-artifact@v4
         with:
           name: nightshift-macos-universal
-          path: dist/*.zip
+          path: |
+            dist/nightshift-*.zip
+            dist/NightShiftCtl-app.zip
+            dist/NightShiftCtl-*.pkg

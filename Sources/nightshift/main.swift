@@ -1,7 +1,7 @@
 import Foundation
 import NightShiftKit
 
-let version = "1.0.0"
+let version = NightShiftCtlVersion.current
 
 let usage = """
 nightshift \(version): control macOS Night Shift from the command line
