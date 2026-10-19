@@ -110,6 +110,18 @@ which case users see no warning.
 
 ## Install
 
+### Homebrew (recommended)
+
+```bash
+brew install --cask workprasanth9/tap/nightshiftctl
+```
+
+This installs NightShiftCtl.app to /Applications and links the `nightshift` CLI
+into Homebrew's bin. Update with `brew upgrade --cask nightshiftctl` and remove
+with `brew uninstall --cask nightshiftctl` (add `--zap` to also remove settings).
+If you installed the .pkg before, add `--force` to replace it. See the
+[tap](https://github.com/workprasanth9/homebrew-tap) for details.
+
 ### Installer package (app and CLI)
 
 Build `dist/NightShiftCtl-<version>.pkg`, or download it from the artifacts of
