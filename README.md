@@ -113,8 +113,15 @@ which case users see no warning.
 ### Homebrew (recommended)
 
 ```bash
-brew install --cask workprasanth9/tap/nightshiftctl
+brew tap workprasanth9/tap
+brew trust workprasanth9/tap
+brew install --cask nightshiftctl
 ```
+
+Homebrew 7 refuses to load casks from a third party tap until you trust it,
+which is what `brew trust` does. Installing by the full name,
+`brew install --cask workprasanth9/tap/nightshiftctl`, also works without that
+step, because naming the tap trusts that one cask.
 
 This installs NightShiftCtl.app to /Applications and links the `nightshift` CLI
 into Homebrew's bin. Update with `brew upgrade --cask nightshiftctl` and remove
